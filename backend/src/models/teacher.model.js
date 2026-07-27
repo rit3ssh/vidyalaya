@@ -1,37 +1,38 @@
 import mongoose from "mongoose";
+import User from "./user.model.js";
 
 
 const teacherSchema = new mongoose.Schema(
     {
-        schoolId: {
+        userId:{
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'School',
-            required: true,
+            ref: 'User',
+            required: true
         },
-        firstName: {
+        qualification: {
             type: String,
-            required: true,
+            required: true
         },
-        lastName: {
-            type: String,      
-
-            required: true,     
-    },
-        email: {
+        joiningDate: {
+            type: Date,
+            required: true
+        },
+        phoneNumber:{
             type: String,
-            required: true,
-            unique: true,
-            lowercase: true,
-            trim: true,
+            required: true
         },
-        password: {
+        specialization:{
             type: String,
-            required: true,
-            minlength: 6,
+            required: true
         },
+        salary:{
+            type: String,
+            required: true
+        }
+            
     },
     {
-        timestamps: true,
+        timestamps: true
     }
 );
 

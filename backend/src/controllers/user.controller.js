@@ -145,6 +145,59 @@ async function viewStudent(req, res) {
 }
 
 async function updateStudent(req, res) {
+    const studentId = req.params.studentId;
+    const schoolId = req.user.schoolId;
+    const { firstName, lastName, email, rollNumber, classId, parentEmail } = req.body;
+
+    try {
+        // Update the core user account
+        const student = await studentModel.findOne({ _id: studentId }).populate('userId');
+        if (!student) {
+            return res.status(404).json({ error: "Student not found" });
+        }
+
+        const updatedUser = await userModel.findOneAndUpdate(
+            { _id: student.userId._id, schoolId, role: 'STUDENT' },
+            { firstName, lastName, email },
+            { new: true }
+        );
+
+        // Resolve the parent account if provided
+        let resolvedParentId = null;
+        if (parentEmail) {
+            const parentUser = await userModel.findOne({ 
+                email: parentEmail.toLowerCase(), 
+                role: 'PARENT', 
+                schoolId 
+            });
+            
+            if (!parentUser) {
+                return res.status(400).json({ error: "No parent account found with this email address. Please register the parent first." });
+            }
+            resolvedParentId = parentUser._id;
+        }
+
+        // Update the academic profile
+        const updatedStudent = await studentModel.findOneAndUpdate(
+            { _id: studentId },
+            { rollNumber, classId, parentId: resolvedParentId },
+            { new: true }
+        );
+
+        res.status(200).json({
+            message: "Student updated successfully",
+            student: {
+                studentId: updatedStudent._id,
+                name: updatedUser.firstName + " " + updatedUser.lastName,
+                email: updatedUser.email,
+                rollNumber: updatedStudent.rollNumber,
+                classId: updatedStudent.classId,
+                parentId: updatedStudent.parentId
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: "Failed to update student" });
+    }
 
 
 }
@@ -152,8 +205,26 @@ async function updateStudent(req, res) {
 
 
 async function deleteStudent(req, res) {
-    // Logic to delete a student
-    res.status(200).json({ message: "Student deleted successfully" });
+    const studentId = req.params.studentId;
+    const schoolId = req.user.schoolId; // the school ID is stored in the user object after authentication
+
+    try {
+        // Find the student to get the associated userId
+        const student = await studentModel.findOne({ _id: studentId });
+        if (!student) {
+            return res.status(404).json({ error: "Student not found" });
+        }
+
+        // Delete the academic profile
+        await studentModel.deleteOne({ _id: studentId });
+
+        // Delete the core user account
+        await userModel.deleteOne({ _id: student.userId, schoolId, role: 'STUDENT' });
+
+        res.status(200).json({ message: "Student deleted successfully" });
+    } catch (error) {
+        res.status(500).json({ error: "Failed to delete student" });
+    }
 }
 
 
@@ -298,28 +369,181 @@ async function deleteParent(req, res) {
  */
 
 async function addTeacher(req, res) {
-    // Logic to add a teacher
-    res.status(200).json({ message: "Teacher added successfully" });
+    const { firstName, lastName, email, qualification, joiningDate, phoneNumber, specialization, salary } = req.body;
+    console.log(salary);
+    const schoolId = req.user.schoolId; // the school ID is available in the authenticated user's data
+
+    if (!firstName || !lastName || !email || !qualification || !joiningDate || !phoneNumber || !specialization || !salary) {
+        return res.status(400).json({ error: "All fields are required" });
+    }
+
+    // Check if the teacher already exists
+    const existingTeacher = await userModel.findOne({ email, role: 'TEACHER', schoolId });
+    if (existingTeacher) {
+        return res.status(400).json({ error: "A teacher with this email already exists" });
+    }
+
+    // Generate a secure random password (12 characters)
+    const temporaryPassword = crypto.randomBytes(6).toString('hex'); 
+    const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
+
+    try {
+        // Create the core login account for the teacher
+        const newUser = await userModel.create({
+            schoolId,
+            firstName,
+            lastName,
+            email,
+            password: hashedPassword,
+            role: 'TEACHER',
+        });
+
+        // Create the teacher profile linked to the core account
+        const newTeacher = await teacherModel.create({
+            userId: newUser._id,
+            qualification,
+            joiningDate,
+            phoneNumber,
+            specialization,
+            salary
+        });
+
+        res.status(200).json({
+            message: "Teacher added successfully",
+            temporaryPassword: temporaryPassword, // Send this so the admin can give it to the teacher
+            teacher: {
+                teacherId: newTeacher._id,
+                name: newUser.firstName + " " + newUser.lastName,
+                email: newUser.email,
+                qualification: newTeacher.qualification,
+                joiningDate: newTeacher.joiningDate,
+                phoneNumber: newTeacher.phoneNumber,
+                specialization: newTeacher.specialization,
+                salary: newTeacher.salary
+            }
+        });
+    } catch (error) {
+        return res.status(500).json({ error: "Failed to add teacher", details: error.message });
+    }
 }
 
 async function viewAllTeachers(req, res) {
-    // Logic to view all teachers
-    res.status(200).json({ message: "All teachers retrieved successfully" });
+    const schoolId = req.user.schoolId; // the school ID is stored in the user object after authentication
+
+    try {
+        const teachers = await teacherModel.find().populate({path:'userId',
+            match:{schoolId,role:'TEACHER'},select:'firstName lastName email'});
+        res.status(200).json({
+            message: "Teachers retrieved successfully",
+            teachers: teachers.map(teacher => ({
+                teacherId: teacher._id,
+                name: teacher.userId.firstName + " " + teacher.userId.lastName,
+                email: teacher.userId.email,
+                qualification: teacher.qualification,
+                joiningDate: teacher.joiningDate,
+                phoneNumber: teacher.phoneNumber,
+                specialization: teacher.specialization,
+                salary: teacher.salary
+            }))
+        });
+    } catch (error) {
+        res.status(500).json({ error: "Failed to retrieve teachers" });
+    }
 }
 
 async function viewTeacher(req, res) {
-    // Logic to view a specific teacher
-    res.status(200).json({ message: "Teacher retrieved successfully" });
+    const teacherId = req.params.teacherId;
+    const schoolId = req.user.schoolId; // the school ID is stored in the user object after authentication
+
+    try {
+        const teacher = await teacherModel.findOne({ _id: teacherId }).populate('userId', 'firstName lastName email');
+
+        if (!teacher) {
+            return res.status(404).json({ error: "Teacher not found" });
+        }
+
+        res.status(200).json({
+            message: "Teacher retrieved successfully",
+            teacher: {
+                teacherId: teacher._id,
+                name: teacher.userId.firstName + " " + teacher.userId.lastName,
+                email: teacher.userId.email,
+                qualification: teacher.qualification,
+                joiningDate: teacher.joiningDate,
+                phoneNumber: teacher.phoneNumber,
+                specialization: teacher.specialization,
+                salary: teacher.salary
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: "Failed to retrieve teacher" });
+    }
 }
 
 async function updateTeacher(req, res) {
-    // Logic to update a teacher
-    res.status(200).json({ message: "Teacher updated successfully" });
+    const teacherId = req.params.teacherId;
+    const schoolId = req.user.schoolId; // the school ID is stored in the user object after authentication
+    const { firstName, lastName, email, qualification, joiningDate, phoneNumber, specialization, salary } = req.body;
+
+    try {
+        // Update the core user account
+        const teacher = await teacherModel.findOne({ _id: teacherId }).populate('userId');
+        if (!teacher) {
+            return res.status(404).json({ error: "Teacher not found" });
+        }
+
+        const updatedUser = await userModel.findOneAndUpdate(
+            { _id: teacher.userId._id, schoolId, role: 'TEACHER' },
+            { firstName, lastName, email },
+            { new: true }
+        );
+
+        // Update the teacher profile
+        const updatedTeacher = await teacherModel.findOneAndUpdate(
+            { _id: teacherId },
+            { qualification, joiningDate, phoneNumber, specialization, salary },
+            { new: true }
+        );
+
+        res.status(200).json({
+            message: "Teacher updated successfully",
+            teacher: {
+                teacherId: updatedTeacher._id,
+                name: updatedUser.firstName + " " + updatedUser.lastName,
+                email: updatedUser.email,
+                qualification: updatedTeacher.qualification,
+                joiningDate: updatedTeacher.joiningDate,
+                phoneNumber: updatedTeacher.phoneNumber,
+                specialization: updatedTeacher.specialization,
+                salary: updatedTeacher.salary
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: "Failed to update teacher" });
+    }
 }
 
 async function deleteTeacher(req, res) {
-    // Logic to delete a teacher
-    res.status(200).json({ message: "Teacher deleted successfully" });
+    const teacherId = req.params.teacherId;
+    const schoolId = req.user.schoolId; // the school ID is stored in the user object after authentication
+
+    try {
+        // Find the teacher to get the associated userId
+        const teacher = await teacherModel.findOne({ _id: teacherId });
+        if (!teacher) {
+            return res.status(404).json({ error: "Teacher not found" });
+        }
+
+        // Delete the teacher profile
+        await teacherModel.deleteOne({ _id: teacherId });
+
+        // Delete the core user account
+        await userModel.deleteOne({ _id: teacher.userId, schoolId, role: 'TEACHER' });
+
+        res.status(200).json({ message: "Teacher deleted successfully" });
+    } catch (error) {
+        res.status(500).json({ error: "Failed to delete teacher" });
+    }   
 }  
 
 
