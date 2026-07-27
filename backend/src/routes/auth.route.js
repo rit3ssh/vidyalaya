@@ -8,7 +8,7 @@ const authRouter = Router();
 authRouter.post("/login",loginController);
 
 
-authRouter.post("/register", registerController);
+authRouter.post("/register-school", registerController);
 
 
 authRouter.get("/logout",logoutController);
