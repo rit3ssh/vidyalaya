@@ -23,10 +23,18 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
     },
-    password: {
+    passwordHash: {
       type: String,
       required: true,
       minlength: 6,
+    },
+    phoneNumber: {
+      type: String,
+      required: true,
+    },
+    profileImageURL: {
+      type: String,
+      required: false,
     },
     role: {
       type: String,
@@ -38,6 +46,34 @@ const userSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+
+userSchema.virtual('studentProfile', {
+  ref: 'Student',        // The model to use
+  localField: '_id',     // Find people where `localField`
+  foreignField: 'userId', // is equal to `foreignField`
+  justOne: true          // Student profiles are 1-to-1 mappings
+});
+
+userSchema.virtual('teacherProfile', {
+  ref: 'Teacher',        // The model to use
+  localField: '_id',     // Find people where `localField`
+  foreignField: 'userId', // is equal to `foreignField`
+  justOne: true          // Teacher profiles are 1-to-1 mappings
+});
+
+userSchema.virtual('parentProfile', {
+  ref: 'Parent',        // The model to use
+  localField: '_id',     // Find people where `localField`
+  foreignField: 'userId', // is equal to `foreignField`
+  justOne: true          // Parent profiles are 1-to-1 mappings
+});
+
+// Ensure virtuals are included when converting documents to JSON
+userSchema.set('toObject', { virtuals: true });
+userSchema.set('toJSON', { virtuals: true });
+
+
 const User = mongoose.model("User", userSchema);
 
 

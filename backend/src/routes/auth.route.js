@@ -5,10 +5,10 @@ import {registerController,loginController,logoutController} from "../controller
 const authRouter = Router();
 
 
+authRouter.post("/register", registerController);
+
+
 authRouter.post("/login",loginController);
-
-
-authRouter.post("/register-school", registerController);
 
 
 authRouter.get("/logout",logoutController);

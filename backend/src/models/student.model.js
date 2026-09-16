@@ -8,20 +8,28 @@ const studentSchema = new mongoose.Schema(
             ref: 'User',
             required: true,
         },
-        rollNumber: {
-            type: String,
-            required: true,
-            trim: true,
-            unique: true,
-        },
         classId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Class',
             required: true,
         },
-        parentId: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'User',
+        rollNumber: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        admissionNumber: {
+            type: String,
+            required: true,
+            trim: true,
+            unique: true,
+        },
+        dateOfBirth: {
+            type: Date,
+            required: true,
+        },
+        admissionDate: {
+            type: Date,
             required: true,
         },
     },
@@ -30,6 +38,7 @@ const studentSchema = new mongoose.Schema(
     }
 );
 
+studentSchema.index({classId: 1, rollNumber: 1}, {unique: true});
 
 const Student = mongoose.model('Student', studentSchema);
 

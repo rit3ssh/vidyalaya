@@ -12,6 +12,19 @@ const schoolSchema = new mongoose.Schema(
             type: String,
             required: true,
         },
+        schoolEmail: {
+            type: String,
+            required: true,
+            unique: true,
+        },
+        schoolPhoneNumber: {
+            type: String,
+            required: true,
+        },
+        schoolLogoURL: {
+            type: String,
+            required: false,
+        },
     },
     {
         timestamps: true,
